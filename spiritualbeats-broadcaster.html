@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SpiritualBeats &mdash; Broadcaster Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0a0f;--surface:#111118;--surface2:#1a1a24;--surface3:#22222f;--border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.12);--text:#f0f0f8;--muted:#7a7a9a;--accent:#7c5cfc;--accent2:#b490ff;--live:#ff4f6a;--green:#3de88a;--amber:#f5a623;--font-head:'Syne',sans-serif;--font-body:'DM Sans',sans-serif;--font-mono:'DM Mono',monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:14px;min-height:100vh;display:flex;flex-direction:column}
+nav{display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:58px;border-bottom:1px solid var(--border);background:rgba(10,10,15,.9);backdrop-filter:blur(12px);position:sticky;top:0;z-index:100}
+.nav-logo{font-family:var(--font-head);font-size:20px;font-weight:800;letter-spacing:-.5px;color:var(--text);display:flex;align-items:center;gap:8px}
+.logo-cross{color:var(--accent2);font-size:18px}
+.nav-badge{background:rgba(124,92,252,.15);border:1px solid rgba(124,92,252,.3);color:var(--accent2);font-family:var(--font-mono);font-size:11px;padding:2px 10px;border-radius:20px}
+.nav-actions{display:flex;gap:10px;align-items:center}
+.fb-pill{font-family:var(--font-mono);font-size:11px;display:flex;align-items:center;gap:5px;padding:3px 10px;border:1px solid var(--border2);border-radius:20px}
+.fb-dot{width:6px;height:6px;border-radius:50%;background:var(--amber)}
+.fb-dot.ok{background:var(--green)}
+.layout{display:grid;grid-template-columns:240px 1fr 280px;flex:1;overflow:hidden;height:calc(100vh - 58px)}
+.sidebar{border-right:1px solid var(--border);padding:20px 0;overflow-y:auto;background:var(--surface)}
+.main{overflow-y:auto}
+.right-panel{border-left:1px solid var(--border);overflow-y:auto;background:var(--surface)}
+.sidebar-section{padding:0 12px;margin-bottom:24px}
+.sidebar-label{font-family:var(--font-mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;padding:0 8px;margin-bottom:6px}
+.sidebar-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;color:var(--muted);font-size:13px;transition:all .15s;margin-bottom:2px;border:none;background:none;width:100%;text-align:left}
+.sidebar-item:hover{background:var(--surface2);color:var(--text)}
+.sidebar-item.active{background:rgba(124,92,252,.12);color:var(--accent2)}
+.sidebar-item svg{width:16px;height:16px;flex-shrink:0}
+.live-indicator{display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;color:var(--live)}
+.pulse-dot{width:7px;height:7px;border-radius:50%;background:var(--live);animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+.main-inner{padding:28px;max-width:780px}
+.section-title{font-family:var(--font-head);font-size:22px;font-weight:700;margin-bottom:4px;letter-spacing:-.3px}
+.section-sub{color:var(--muted);font-size:13px;margin-bottom:24px}
+.broadcast-console{background:var(--surface);border:1px solid var(--border2);border-radius:16px;overflow:hidden;margin-bottom:24px}
+.console-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.console-title{font-family:var(--font-head);font-size:14px;font-weight:600}
+.console-body{padding:20px}
+.audio-meter{display:flex;gap:3px;align-items:flex-end;height:40px;margin-bottom:16px}
+.meter-bar{width:5px;background:var(--surface3);border-radius:3px;flex-shrink:0;transition:height .05s ease}
+.meter-bar.active{background:var(--green)}
+.meter-bar.peak{background:var(--live)}
+.source-tabs{display:flex;gap:6px;margin-bottom:20px}
+.source-tab{padding:7px 14px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--muted);transition:all .15s}
+.source-tab.active{background:var(--accent);border-color:var(--accent);color:white}
+.source-tab:hover:not(.active){color:var(--text)}
+.mic-panel,.file-panel{display:none}
+.mic-panel.visible,.file-panel.visible{display:block}
+.mic-status{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--surface2);border-radius:10px;margin-bottom:16px}
+.mic-icon{width:36px;height:36px;border-radius:50%;background:rgba(61,232,138,.1);border:1px solid rgba(61,232,138,.2);display:flex;align-items:center;justify-content:center}
+.mic-icon svg{width:18px;height:18px;color:var(--green)}
+.upload-zone{border:1px dashed var(--border2);border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:16px;position:relative}
+.upload-zone:hover{border-color:var(--accent);background:rgba(124,92,252,.04)}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.file-chosen{display:none;align-items:center;gap:10px;padding:12px 14px;background:rgba(61,232,138,.06);border:1px solid rgba(61,232,138,.15);border-radius:10px;margin-bottom:16px}
+.file-chosen.visible{display:flex}
+.controls-row{display:flex;gap:10px;align-items:center;padding-top:16px;border-top:1px solid var(--border)}
+.btn{padding:9px 18px;border-radius:9px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s;font-family:var(--font-body)}
+.btn-primary{background:var(--accent);color:white}
+.btn-primary:hover{background:#8f70ff}
+.btn-live{background:var(--live);color:white;display:flex;align-items:center;gap:6px}
+.btn-live:hover{background:#ff6b82}
+.btn-stop{background:var(--surface3);color:var(--text);border:1px solid var(--border2)}
+.btn-stop:hover{background:var(--surface2)}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border);padding:8px 14px}
+.btn-ghost:hover{color:var(--text);border-color:var(--border2)}
+.btn-sm{padding:6px 12px;font-size:12px}
+.btn-danger{background:rgba(255,79,106,.1);color:var(--live);border:1px solid rgba(255,79,106,.2)}
+.volume-row{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.volume-row label{font-size:12px;color:var(--muted);width:50px}
+.volume-row input[type=range]{flex:1;accent-color:var(--accent)}
+.vol-val{font-family:var(--font-mono);font-size:12px;color:var(--muted);width:32px;text-align:right}
+.status-bar{display:flex;align-items:center;gap:16px;margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+.status-item{display:flex;align-items:center;gap:5px}
+.dot-green{width:6px;height:6px;border-radius:50%;background:var(--green)}
+.dot-amber{width:6px;height:6px;border-radius:50%;background:var(--amber)}
+.dot-red{width:6px;height:6px;border-radius:50%;background:var(--live)}
+.events-grid{display:grid;gap:12px}
+.event-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;display:flex;align-items:center;gap:16px;transition:border-color .15s}
+.event-card:hover{border-color:var(--border2)}
+.event-date{text-align:center;min-width:44px}
+.event-day{font-family:var(--font-head);font-size:24px;font-weight:700;line-height:1}
+.event-mon{font-family:var(--font-mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+.event-divider{width:1px;height:44px;background:var(--border)}
+.event-info{flex:1;min-width:0}
+.event-name{font-size:14px;font-weight:500;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.event-meta{display:flex;gap:12px;flex-wrap:wrap}
+.event-tag{font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:20px;background:var(--surface3);color:var(--muted)}
+.event-tag.live-tag{background:rgba(255,79,106,.1);color:var(--live)}
+.event-tag.sched-tag{background:rgba(124,92,252,.1);color:var(--accent2)}
+.event-tag.done-tag{background:rgba(61,232,138,.08);color:var(--green)}
+.event-actions{display:flex;gap:6px}
+.form-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px;margin-bottom:24px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group label{font-size:11px;font-family:var(--font-mono);color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.form-group input,.form-group textarea,.form-group select{background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);padding:9px 12px;font-size:13px;font-family:var(--font-body);outline:none;transition:border-color .15s}
+.form-group input:focus,.form-group textarea:focus,.form-group select:focus{border-color:var(--accent)}
+.form-group textarea{resize:vertical;min-height:72px}
+.form-full{margin-bottom:12px}
+.link-box{display:flex;gap:8px;align-items:center;padding:10px 12px;background:var(--surface2);border:1px solid var(--border2);border-radius:9px}
+.link-url{flex:1;font-family:var(--font-mono);font-size:12px;color:var(--accent2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.panel-section{padding:18px 18px 0;margin-bottom:20px}
+.panel-head{font-family:var(--font-mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+.recording-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.recording-item:last-child{border-bottom:none}
+.rec-play{width:30px;height:30px;border-radius:50%;background:var(--surface3);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:background .15s}
+.rec-play:hover{background:var(--accent)}
+.rec-play svg{width:12px;height:12px;color:var(--text)}
+.rec-info{flex:1;min-width:0}
+.rec-name{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rec-date{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px}
+.rec-dur{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat-card{background:var(--surface2);border-radius:10px;padding:12px 14px}
+.stat-val{font-family:var(--font-head);font-size:22px;font-weight:700}
+.stat-label{font-size:11px;color:var(--muted);margin-top:2px}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:10px}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 18px;font-size:13px;z-index:999;display:flex;align-items:center;gap:8px;transform:translateY(20px);opacity:0;transition:all .3s;pointer-events:none}
+.toast.show{transform:translateY(0);opacity:1}
+.toast-dot{width:7px;height:7px;border-radius:50%;background:var(--green)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:none;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:28px;width:480px;max-width:90vw}
+.modal-head{font-family:var(--font-head);font-size:18px;font-weight:700;margin-bottom:6px}
+.modal-sub{color:var(--muted);font-size:13px;margin-bottom:22px}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+.view-pane{display:none}
+.view-pane.active{display:block}
+.setup-box{background:rgba(245,166,35,.07);border:1px solid rgba(245,166,35,.2);border-radius:12px;padding:18px 20px;margin-bottom:20px}
+.setup-box h3{color:var(--amber);font-size:13px;font-weight:600;margin-bottom:10px}
+.setup-step{display:flex;gap:10px;font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.6}
+.step-n{color:var(--amber);font-family:var(--font-mono);font-size:11px;min-width:16px;font-weight:500}
+code{background:var(--surface3);padding:1px 6px;border-radius:4px;font-family:var(--font-mono);font-size:11px;color:var(--accent2)}
+.svc-card{background:var(--surface2);border-radius:10px;padding:14px 16px;display:flex;gap:14px;align-items:flex-start;margin-bottom:10px}
+.svc-icon{font-size:20px;flex-shrink:0}
+.svc-title{font-size:13px;font-weight:500;margin-bottom:4px}
+.svc-desc{font-size:12px;color:var(--muted);line-height:1.6}
+.sync-row{display:flex;gap:10px;align-items:center;font-size:13px;margin-bottom:6px}
+.sync-check{color:var(--green);font-size:14px}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo"><span class="logo-cross">&#10013;</span> SpiritualBeats</div>
+  <div style="display:flex;align-items:center;gap:14px;">
+    <div class="live-indicator" id="liveIndicator" style="display:none;"><span class="pulse-dot"></span> LIVE</div>
+    <div class="fb-pill"><span class="fb-dot" id="fbDot"></span><span id="fbTxt">Firebase: demo mode</span></div>
+    <span class="nav-badge">Studio</span>
+  </div>
+  <div class="nav-actions">
+    <button class="btn btn-ghost btn-sm" onclick="openShareModal()">Share listener link</button>
+    <div style="width:32px;height:32px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:14px;">&#10013;</div>
+  </div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Studio</div>
+      <button class="sidebar-item active" onclick="showView('broadcast',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49M7.76 16.24a6 6 0 0 1 0-8.49M20.49 3.51a12 12 0 0 1 0 16.98M3.51 20.49a12 12 0 0 1 0-16.98"/></svg>
+        Broadcast
+      </button>
+      <button class="sidebar-item" onclick="showView('schedule',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Events
+      </button>
+      <button class="sidebar-item" onclick="showView('recordings',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15V6"/><path d="M18.5 18a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/><path d="M12 12H3"/><path d="M16 6H3"/><path d="M12 18H3"/></svg>
+        Recordings
+      </button>
+      <button class="sidebar-item" onclick="showView('firebase',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        Firebase Setup
+      </button>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Actions</div>
+      <button class="sidebar-item" onclick="openShareModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        Share Link
+      </button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="main-inner">
+
+      <!-- BROADCAST -->
+      <div class="view-pane active" id="view-broadcast">
+        <div class="section-title">Broadcast Studio</div>
+        <div class="section-sub">Go live with your microphone or stream a pre-recorded file</div>
+        <div class="broadcast-console">
+          <div class="console-header">
+            <div class="console-title">Audio Console</div>
+            <div class="status-bar" id="statusBar">
+              <div class="status-item" id="readyStatus"><div class="dot-amber"></div> Ready</div>
+              <div class="status-item" id="liveStatus" style="display:none;"><div class="dot-red"></div><span style="color:var(--live);font-family:var(--font-mono);font-size:11px;">LIVE</span></div>
+              <div id="timerDisplay" style="display:none;font-family:var(--font-mono);font-size:12px;color:var(--live);">00:00:00</div>
+            </div>
+          </div>
+          <div class="console-body">
+            <div class="audio-meter" id="audioMeter"></div>
+            <div class="source-tabs">
+              <button class="source-tab active" onclick="switchSource('mic',this)">&#127897; Microphone</button>
+              <button class="source-tab" onclick="switchSource('file',this)">&#128193; Audio File</button>
+            </div>
+            <div class="mic-panel visible" id="micPanel">
+              <div class="mic-status">
+                <div class="mic-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                </div>
+                <div>
+                  <div style="font-size:13px;font-weight:500;" id="micLabel">Microphone ready</div>
+                  <div style="font-size:11px;color:var(--muted);margin-top:2px;" id="micSub">Click "Request Mic" to enable input</div>
+                </div>
+                <button class="btn btn-ghost btn-sm" onclick="requestMic()" id="micBtn">Request Mic</button>
+              </div>
+              <div class="volume-row"><label>Volume</label><input type="range" min="0" max="100" value="80" oninput="updateVol(this)"><span class="vol-val">80%</span></div>
+            </div>
+            <div class="file-panel" id="filePanel">
+              <div class="file-chosen" id="fileChosen">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                <span id="fileChosenName" style="font-size:13px;"></span>
+                <button class="btn btn-ghost btn-sm" onclick="clearFile()" style="margin-left:auto;">Clear</button>
+              </div>
+              <div class="upload-zone" id="dropZone">
+                <input type="file" accept="audio/*" id="audioFileInput" onchange="onFileChosen(this)">
+                <div style="font-size:28px;margin-bottom:8px;">&#127925;</div>
+                <div style="font-size:13px;color:var(--muted);"><strong style="color:var(--text);">Drop an audio file here</strong><br>or click to browse &middot; MP3, WAV, FLAC, AAC</div>
+              </div>
+              <div class="volume-row"><label>Volume</label><input type="range" min="0" max="100" value="80" oninput="updateVol(this)"><span class="vol-val">80%</span></div>
+            </div>
+            <div class="controls-row">
+              <button class="btn btn-live" id="goLiveBtn" onclick="toggleLive()">
+                <span class="pulse-dot" style="width:6px;height:6px;background:white;animation:none;"></span> Go Live
+              </button>
+              <button class="btn btn-stop" id="stopBtn" onclick="stopBroadcast()" style="display:none;">&#9209; Stop</button>
+              <button class="btn btn-ghost btn-sm" onclick="openShareModal()">&#128279; Share listener link</button>
+              <div id="listenerCount" style="display:none;margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--muted);"><span id="lcNum">0</span> listeners</div>
+            </div>
+          </div>
+        </div>
+        <div class="form-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <div style="font-family:var(--font-head);font-size:15px;font-weight:600;">Event Details</div>
+            <button class="btn btn-ghost btn-sm" onclick="showView('schedule',document.querySelectorAll('.sidebar-item')[1])">+ New event</button>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Event Name</label><input type="text" id="broadcastTitle" value="Sunday Service"></div>
+            <div class="form-group"><label>Listener Link Slug</label><input type="text" id="slugInput" value="sunday-service"></div>
+          </div>
+          <div class="form-group form-full"><label>Description</label><textarea>Weekly worship and word &#128591;</textarea></div>
+          <div style="margin-top:8px;">
+            <div class="panel-head">Listener link</div>
+            <div class="link-box"><div class="link-url" id="linkPreview">spiritualbeats-listener.html#sunday-service</div><button class="btn btn-ghost btn-sm" onclick="copyLink()">Copy</button></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- EVENTS -->
+      <div class="view-pane" id="view-schedule">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px;">
+          <div class="section-title">Events</div>
+          <button class="btn btn-primary btn-sm" onclick="openNewEvent()">+ Schedule event</button>
+        </div>
+        <div class="section-sub">Saved to Firebase &mdash; appear on the listener app instantly</div>
+        <div class="events-grid" id="eventsGrid"></div>
+      </div>
+
+      <!-- RECORDINGS -->
+      <div class="view-pane" id="view-recordings">
+        <div class="section-title">Recordings</div>
+        <div class="section-sub">Uploaded to Firebase Storage when you stop a broadcast</div>
+        <div id="recordingsList"></div>
+        <div id="emptyRec" style="color:var(--muted);font-size:13px;padding:20px 0;display:none;">No recordings yet. Go live and stop to save one.</div>
+      </div>
+
+      <!-- FIREBASE SETUP -->
+      <div class="view-pane" id="view-firebase">
+        <div class="section-title">Firebase Setup</div>
+        <div class="section-sub">Connect SpiritualBeats so live state, events, and recordings sync to all listeners automatically</div>
+
+        <div class="setup-box">
+          <h3>&#9889; 3 steps to activate Firebase</h3>
+          <div class="setup-step"><span class="step-n">1</span><span>Go to <strong style="color:var(--text);">console.firebase.google.com</strong>, create a project (e.g. <code>spiritualbeats</code>)</span></div>
+          <div class="setup-step"><span class="step-n">2</span><span>Project settings &rarr; <strong style="color:var(--text);">Add app &rarr; Web</strong> &rarr; copy the <code>firebaseConfig</code> object shown</span></div>
+          <div class="setup-step"><span class="step-n">3</span><span>Open <code>spiritualbeats-broadcaster.html</code> in a text editor, find the <code>YOUR_API_KEY</code> block near the top, replace with your config values</span></div>
+          <div class="setup-step"><span class="step-n">4</span><span>Do the same in <code>spiritualbeats-listener.html</code> &mdash; both files need the same config to read from the same database</span></div>
+        </div>
+
+        <div class="form-card">
+          <div style="font-family:var(--font-head);font-size:15px;font-weight:600;margin-bottom:14px;">Enable in Firebase Console</div>
+          <div class="svc-card"><div class="svc-icon">&#128225;</div><div><div class="svc-title">Realtime Database</div><div class="svc-desc">Build &rarr; Realtime Database &rarr; Create Database &rarr; Start in test mode. Syncs live on/off state and scheduled events to all listener tabs instantly.</div></div></div>
+          <div class="svc-card"><div class="svc-icon">&#128452;</div><div><div class="svc-title">Firebase Storage</div><div class="svc-desc">Build &rarr; Storage &rarr; Get started &rarr; Start in test mode. Stores recorded .webm audio files. Free tier: 5 GB storage, 1 GB/day download.</div></div></div>
+          <div class="svc-card"><div class="svc-icon">&#128274;</div><div><div class="svc-title">Security Rules (do this before sharing)</div><div class="svc-desc">Once tested, lock down DB and Storage so only you (the broadcaster) can write. Ask me to generate the exact rules file for your project.</div></div></div>
+        </div>
+
+        <div class="form-card">
+          <div style="font-family:var(--font-head);font-size:15px;font-weight:600;margin-bottom:14px;">What syncs automatically</div>
+          <div class="sync-row"><span class="sync-check">&#10003;</span><span><strong style="color:var(--text);">Live status</strong> &mdash; <span style="color:var(--muted);">listener app switches to the live player the moment you click Go Live</span></span></div>
+          <div class="sync-row"><span class="sync-check">&#10003;</span><span><strong style="color:var(--text);">Events</strong> &mdash; <span style="color:var(--muted);">scheduled events appear on the Upcoming tab immediately</span></span></div>
+          <div class="sync-row"><span class="sync-check">&#10003;</span><span><strong style="color:var(--text);">Recordings</strong> &mdash; <span style="color:var(--muted);">audio uploads to Storage when you stop; listener app shows it within seconds</span></span></div>
+          <div class="sync-row"><span class="sync-check">&#10003;</span><span><strong style="color:var(--text);">Listener count</strong> &mdash; <span style="color:var(--muted);">each listener tab increments a counter you watch in real time</span></span></div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <aside class="right-panel">
+    <div class="panel-section">
+      <div class="panel-head">Stats</div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-val" id="totalEvents">0</div><div class="stat-label">Events</div></div>
+        <div class="stat-card"><div class="stat-val" id="totalRec">0</div><div class="stat-label">Recordings</div></div>
+        <div class="stat-card"><div class="stat-val" id="totalListeners">0</div><div class="stat-label">Live listeners</div></div>
+        <div class="stat-card"><div class="stat-val" id="totalHours">0h</div><div class="stat-label">Broadcast time</div></div>
+      </div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-head">Recent recordings</div>
+      <div id="sideRecordings"><p style="font-size:12px;color:var(--muted);">None yet.</p></div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-head">Firebase</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8;">
+        <div>Realtime DB: <span id="dbSt" style="color:var(--amber);">demo mode</span></div>
+        <div>Storage: <span id="stSt" style="color:var(--amber);">demo mode</span></div>
+        <button class="btn btn-ghost btn-sm" style="margin-top:8px;" onclick="showView('firebase',document.querySelectorAll('.sidebar-item')[3])">Setup guide</button>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- SHARE MODAL -->
+<div class="modal-overlay" id="shareModal">
+  <div class="modal">
+    <div class="modal-head">Share listener link</div>
+    <div class="modal-sub">Send this to your congregation &mdash; they can tune in live and listen to recordings</div>
+    <div class="link-box"><div class="link-url" id="modalLink"></div></div>
+    <div style="margin-top:12px;padding:12px 14px;background:var(--surface2);border-radius:9px;font-size:12px;color:var(--muted);line-height:1.6;">
+      &#128161; Host both HTML files together (e.g. on GitHub Pages, Netlify, or any static host) and share the real URL.
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('shareModal')">Close</button>
+      <button class="btn btn-primary" onclick="copyLink();closeModal('shareModal')">Copy link</button>
+    </div>
+  </div>
+</div>
+
+<!-- NEW EVENT MODAL -->
+<div class="modal-overlay" id="newEventModal">
+  <div class="modal">
+    <div class="modal-head">Schedule new event</div>
+    <div class="modal-sub">Will be saved to Firebase and appear on the listener app immediately</div>
+    <div class="form-row">
+      <div class="form-group"><label>Event Name</label><input type="text" id="ne_title" placeholder="Sunday Service"></div>
+      <div class="form-group"><label>Link Slug</label><input type="text" id="ne_slug" placeholder="sunday-service"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Date</label><input type="date" id="ne_date"></div>
+      <div class="form-group"><label>Time</label><input type="time" id="ne_time"></div>
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label>Description</label>
+      <textarea id="ne_desc" placeholder="What's this event about?" style="min-height:60px;"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('newEventModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEvent()">Schedule event</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><div class="toast-dot"></div><span id="toastMsg"></span></div>
+
+<!-- Firebase SDK (ESM) -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, set, onValue, push, remove, serverTimestamp }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getStorage, ref as sRef, uploadBytes, getDownloadURL }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
+
+// ================================================================
+const firebaseConfig = {
+  apiKey:            "AIzaSyD-z4yymqmpOvJ_Ob60BScieAHbmxNPwDA",
+  authDomain:        "spiritualbeats-46b90.firebaseapp.com",
+  databaseURL:       "https://spiritualbeats-46b90-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:         "spiritualbeats-46b90",
+  storageBucket:     "spiritualbeats-46b90.firebasestorage.app",
+  messagingSenderId: "240289150574",
+  appId:             "1:240289150574:web:b119d33afe52365fdc987f",
+  measurementId:     "G-K90D67T1Y6"
+};
+
+const configured = firebaseConfig.apiKey !== "YOUR_API_KEY";
+let db, storage;
+
+if (configured) {
+  const app = initializeApp(firebaseConfig);
+  db      = getDatabase(app);
+  storage = getStorage(app);
+}
+
+// ── Write live status (called by Go Live / Stop) ────────────────
+window.fbSetLive = async (isLive, evData={}) => {
+  if (!db) return;
+  await set(ref(db,'channel/live'), {
+    isLive, title: evData.title||'', desc: evData.desc||'',
+    slug: evData.slug||'', startedAt: isLive ? serverTimestamp() : null
+  });
+};
+
+// ── Listen for real-time listener count ────────────────────────
+window.fbWatchListeners = (cb) => {
+  if (!db) return;
+  onValue(ref(db,'channel/live/listenerCount'), s => cb(s.val()||0));
+};
+
+// ── Save a scheduled event ─────────────────────────────────────
+window.fbPushEvent = async (ev) => {
+  if (!db) return false;
+  await push(ref(db,'events'), ev);
+  return true;
+};
+
+// ── Real-time events feed ──────────────────────────────────────
+window.fbWatchEvents = (cb) => {
+  if (!db) { cb([]); return; }
+  onValue(ref(db,'events'), s => {
+    const d = s.val()||{};
+    cb(Object.entries(d).map(([id,v])=>({...v,fbId:id})));
+  });
+};
+
+// ── Delete an event ────────────────────────────────────────────
+window.fbRemoveEvent = async (fbId) => {
+  if (!db || !fbId) return;
+  await remove(ref(db,'events/'+fbId));
+};
+
+// ── Upload recording blob -> Storage, then save metadata ───────
+window.fbUploadRec = async (blob, title, durSec) => {
+  if (!storage || !db) {
+    // Local fallback
+    window._addRec(title, URL.createObjectURL(blob), window.formatDur(durSec));
+    return;
+  }
+  window.showToast('Uploading to Firebase Storage\u2026');
+  const path = 'recordings/' + Date.now() + '_' + title.replace(/\s+/g,'-') + '.webm';
+  await uploadBytes(sRef(storage, path), blob);
+  const url = await getDownloadURL(sRef(storage, path));
+  await push(ref(db,'recordings'), {
+    title, url,
+    date: new Date().toLocaleDateString('en-AU',{month:'short',day:'numeric',year:'numeric'}),
+    dur: window.formatDur(durSec), durSec,
+    createdAt: serverTimestamp()
+  });
+  window.showToast('Recording saved to Firebase \u2713');
+};
+
+// ── Real-time recordings feed ──────────────────────────────────
+window.fbWatchRecs = (cb) => {
+  if (!db) { cb([]); return; }
+  onValue(ref(db,'recordings'), s => {
+    const d = s.val()||{};
+    cb(Object.entries(d).map(([id,v])=>({...v,fbId:id})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)));
+  });
+};
+
+window.FB_CONFIGURED = configured;
+window.dispatchEvent(new Event('fb-ready'));
+</script>
+
+<script>
+// ── LOCAL SEED DATA ─────────────────────────────────────────────
+let _events = [
+  {id:'local-1',title:'Sunday Service',slug:'sunday-service',date:'2026-06-07',time:'10:00',desc:'Weekly worship and word',status:'scheduled'},
+  {id:'local-2',title:'Friday Prayer Night',slug:'friday-prayer',date:'2026-05-30',time:'19:00',desc:'Community prayer',status:'done',duration:'58m'},
+];
+let _recs = [];
+
+// ── WAIT FOR FIREBASE ───────────────────────────────────────────
+window.addEventListener('fb-ready', () => {
+  const cfg = window.FB_CONFIGURED;
+  document.getElementById('fbDot').classList.toggle('ok', cfg);
+  document.getElementById('fbTxt').textContent = cfg ? 'Firebase: connected' : 'Firebase: demo mode';
+  document.getElementById('dbSt').textContent  = cfg ? 'connected' : 'demo mode';
+  document.getElementById('stSt').textContent  = cfg ? 'connected' : 'demo mode';
+  document.getElementById('dbSt').style.color  = cfg ? 'var(--green)' : 'var(--amber)';
+  document.getElementById('stSt').style.color  = cfg ? 'var(--green)' : 'var(--amber)';
+
+  if (window.fbWatchEvents) window.fbWatchEvents(list => { _events = list; renderEvents(); });
+  if (window.fbWatchRecs)   window.fbWatchRecs(list   => { _recs   = list; renderRecs(); document.getElementById('totalRec').textContent = list.length; });
+  if (window.fbWatchListeners) window.fbWatchListeners(n => {
+    document.getElementById('totalListeners').textContent = n;
+    document.getElementById('lcNum').textContent = n;
+  });
+});
+
+// ── STATE ───────────────────────────────────────────────────────
+let isLive=false, timerSec=0, timerInt=null, meterRAF=null;
+let audioCtx=null, mediaStream=null, analyser=null, recorder=null, chunks=[];
+let currentSrc='mic';
+
+// ── METER ───────────────────────────────────────────────────────
+function buildMeter(){
+  const m=document.getElementById('audioMeter'); m.innerHTML='';
+  for(let i=0;i<48;i++){const b=document.createElement('div');b.className='meter-bar';b.style.height='6px';m.appendChild(b);}
+}
+buildMeter();
+
+function animateMeter(active, an){
+  const bars=document.querySelectorAll('.meter-bar');
+  if(!active){bars.forEach(b=>{b.className='meter-bar';b.style.height='6px';});return;}
+  const buf=new Uint8Array(an?an.frequencyBinCount:128);
+  function tick(){
+    if(!isLive)return;
+    if(an)an.getByteFrequencyData(buf);
+    bars.forEach((b,i)=>{
+      const v=an?(buf[Math.floor(i*buf.length/bars.length)]/255):Math.max(.05,(Math.sin(Date.now()/200+i*.3)*.5+.5)*(.3+Math.random()*.4));
+      const h=Math.max(4,Math.floor(v*40));
+      b.style.height=h+'px';
+      b.className='meter-bar'+(v>.05?' active':'')+(v>.85?' peak':'');
+    });
+    meterRAF=requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+// ── TIMER ───────────────────────────────────────────────────────
+function startTimer(){
+  timerSec=0; const d=document.getElementById('timerDisplay'); d.style.display='';
+  timerInt=setInterval(()=>{
+    timerSec++;
+    const h=String(Math.floor(timerSec/3600)).padStart(2,'0');
+    const m=String(Math.floor((timerSec%3600)/60)).padStart(2,'0');
+    const s=String(timerSec%60).padStart(2,'0');
+    d.textContent=h+':'+m+':'+s;
+    document.getElementById('totalHours').textContent=(timerSec/3600).toFixed(1)+'h';
+  },1000);
+}
+function stopTimer(){clearInterval(timerInt);document.getElementById('timerDisplay').style.display='none';}
+
+window.formatDur=function(sec){
+  const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60;
+  if(h>0)return h+'h '+m+'m'; if(m>0)return m+'m '+s+'s'; return s+'s';
+};
+
+// ── MIC ─────────────────────────────────────────────────────────
+async function requestMic(){
+  try{
+    mediaStream=await navigator.mediaDevices.getUserMedia({audio:true});
+    document.getElementById('micLabel').textContent='Microphone connected';
+    document.getElementById('micSub').textContent='Ready to broadcast';
+    const b=document.getElementById('micBtn'); b.textContent='✓ Connected'; b.disabled=true;
+    showToast('Microphone connected!');
+  }catch(e){showToast('Could not access mic \u2014 check browser permissions');}
+}
+
+// ── SOURCE ──────────────────────────────────────────────────────
+function switchSource(src,el){
+  currentSrc=src;
+  document.querySelectorAll('.source-tab').forEach(t=>t.classList.remove('active')); el.classList.add('active');
+  document.getElementById('micPanel').classList.toggle('visible',src==='mic');
+  document.getElementById('filePanel').classList.toggle('visible',src==='file');
+}
+function onFileChosen(input){
+  const f=input.files[0]; if(!f)return;
+  document.getElementById('fileChosenName').textContent=f.name;
+  document.getElementById('fileChosen').classList.add('visible');
+  document.getElementById('dropZone').style.display='none';
+  showToast('File loaded: '+f.name);
+}
+function clearFile(){
+  document.getElementById('fileChosen').classList.remove('visible');
+  document.getElementById('dropZone').style.display='';
+  document.getElementById('audioFileInput').value='';
+}
+function updateVol(el){const v=el.parentElement.querySelector('.vol-val');if(v)v.textContent=el.value+'%';}
+
+// ── GO LIVE ─────────────────────────────────────────────────────
+async function toggleLive(){
+  if(isLive)return;
+  isLive=true;
+  document.getElementById('goLiveBtn').style.display='none';
+  document.getElementById('stopBtn').style.display='';
+  document.getElementById('liveIndicator').style.display='flex';
+  document.getElementById('listenerCount').style.display='';
+  document.getElementById('readyStatus').style.display='none';
+  document.getElementById('liveStatus').style.display='';
+  document.getElementById('timerDisplay').style.display='';
+  startTimer();
+  const evData={title:document.getElementById('broadcastTitle').value,desc:'',slug:document.getElementById('slugInput').value};
+  if(window.fbSetLive) window.fbSetLive(true,evData);
+  try{
+    if(!mediaStream&&currentSrc==='mic') mediaStream=await navigator.mediaDevices.getUserMedia({audio:true});
+    if(mediaStream){
+      audioCtx=new AudioContext();
+      const src=audioCtx.createMediaStreamSource(mediaStream);
+      analyser=audioCtx.createAnalyser(); analyser.fftSize=256; src.connect(analyser);
+      recorder=new MediaRecorder(mediaStream); chunks=[];
+      recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
+      recorder.start(1000);
+    }
+  }catch(e){}
+  animateMeter(true,analyser);
+  showToast('You are now live on SpiritualBeats!');
+}
+
+// ── STOP ────────────────────────────────────────────────────────
+function stopBroadcast(){
+  if(!isLive){ showToast('Not currently live'); return; }
+  isLive=false;
+  cancelAnimationFrame(meterRAF);
+  stopTimer();
+  // Reset UI immediately so user knows it worked
+  document.getElementById('goLiveBtn').style.display='';
+  document.getElementById('stopBtn').style.display='none';
+  document.getElementById('liveIndicator').style.display='none';
+  document.getElementById('listenerCount').style.display='none';
+  buildMeter();
+  document.getElementById('readyStatus').style.display='';
+  document.getElementById('liveStatus').style.display='none';
+  // Tell Firebase we're offline
+  if(window.fbSetLive) window.fbSetLive(false);
+  showToast('Broadcast ended — saving recording…');
+  const title=document.getElementById('broadcastTitle').value||'SpiritualBeats Session';
+  // Stop recorder and upload
+  try {
+    if(recorder&&recorder.state!=='inactive'){
+      recorder.stop();
+      recorder.onstop=()=>{
+        const blob=new Blob(chunks,{type:'audio/webm'});
+        if(window.fbUploadRec) window.fbUploadRec(blob,title,timerSec);
+        else window._addRec(title,URL.createObjectURL(blob),window.formatDur(timerSec));
+      };
+    } else {
+      window._addRec(title,null,window.formatDur(timerSec));
+    }
+  } catch(e){ console.error('Recorder stop error:',e); }
+  // Stop mic stream
+  try {
+    if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}
+    if(audioCtx){audioCtx.close();audioCtx=null;}
+  } catch(e){ console.error('Stream cleanup error:',e); }
+}
+
+// ── RECORDINGS ──────────────────────────────────────────────────
+window._addRec=function(title,url,dur){
+  _recs.unshift({title,url,dur,date:new Date().toLocaleDateString('en-AU',{month:'short',day:'numeric',year:'numeric'})});
+  renderRecs(); document.getElementById('totalRec').textContent=_recs.length;
+};
+
+function renderRecs(){
+  const list=document.getElementById('recordingsList'), side=document.getElementById('sideRecordings');
+  document.getElementById('emptyRec').style.display=_recs.length?'none':'';
+  const mk=(r,sm)=>{
+    const d=document.createElement('div'); d.className='recording-item';
+    d.innerHTML=`<button class="rec-play" onclick="${r.url?'new Audio(\''+r.url+'\').play()':'showToast(\'No audio \u2014 configure Firebase to save recordings\')'}" title="Play"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg></button><div class="rec-info"><div class="rec-name">${r.title}</div><div class="rec-date">${r.date}</div></div><div class="rec-dur">${r.dur}</div>${!sm&&r.url?'<a href="'+r.url+'" target="_blank" class="btn btn-ghost btn-sm" style="text-decoration:none;">&#8595;</a>':''}`;
+    return d;
+  };
+  list.innerHTML=''; side.innerHTML='';
+  _recs.forEach(r=>{list.appendChild(mk(r,false));side.appendChild(mk(r,true));});
+}
+renderRecs();
+
+// ── EVENTS ──────────────────────────────────────────────────────
+function renderEvents(){
+  const g=document.getElementById('eventsGrid'); g.innerHTML='';
+  _events.forEach(ev=>{
+    const d=new Date(ev.date+'T'+ev.time);
+    const day=d.getDate(),mon=d.toLocaleString('en',{month:'short'}).toUpperCase();
+    const ts=d.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'});
+    const tc=ev.status==='live'?'live-tag':ev.status==='scheduled'?'sched-tag':'done-tag';
+    const tl=ev.status==='live'?'LIVE':ev.status==='scheduled'?'Scheduled':'Recorded';
+    const c=document.createElement('div'); c.className='event-card';
+    c.innerHTML=`<div class="event-date"><div class="event-day">${day}</div><div class="event-mon">${mon}</div></div><div class="event-divider"></div><div class="event-info"><div class="event-name">${ev.title}</div><div class="event-meta"><span class="event-tag ${tc}">${tl}</span><span class="event-tag">${ts}</span>${ev.duration?'<span class="event-tag">'+ev.duration+'</span>':''}</div></div><div class="event-actions">${ev.status==='scheduled'?'<button class="btn btn-primary btn-sm" onclick="goLiveFromEvent()">Go Live</button>':''}<button class="btn btn-danger btn-sm" onclick="delEvent(\'${ev.fbId||ev.id}\')">&#10005;</button></div>`;
+    g.appendChild(c);
+  });
+  document.getElementById('totalEvents').textContent=_events.length;
+}
+renderEvents();
+
+function goLiveFromEvent(){showView('broadcast',document.querySelectorAll('.sidebar-item')[0]);setTimeout(toggleLive,200);}
+function delEvent(id){
+  if(window.fbRemoveEvent) window.fbRemoveEvent(id);
+  _events=_events.filter(e=>String(e.fbId||e.id)!==String(id)); renderEvents(); showToast('Event removed');
+}
+
+// ── MODALS ──────────────────────────────────────────────────────
+function openShareModal(){
+  const slug=document.getElementById('slugInput').value||'sunday-service';
+  document.getElementById('modalLink').textContent='spiritualbeats-listener.html#'+slug;
+  document.getElementById('shareModal').classList.add('open');
+}
+function openNewEvent(){document.getElementById('newEventModal').classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+function saveEvent(){
+  const title=document.getElementById('ne_title').value.trim();
+  const slug=document.getElementById('ne_slug').value.trim();
+  const date=document.getElementById('ne_date').value;
+  const time=document.getElementById('ne_time').value;
+  if(!title||!date||!time){showToast('Please fill all required fields');return;}
+  const ev={id:Date.now(),title,slug:slug||title.toLowerCase().replace(/\s+/g,'-'),date,time,desc:document.getElementById('ne_desc').value,status:'scheduled'};
+  if(window.fbPushEvent){
+    window.fbPushEvent(ev).then(ok=>{ if(!ok){_events.unshift(ev);renderEvents();} showToast('Event scheduled: '+title); });
+  } else { _events.unshift(ev); renderEvents(); showToast('Event scheduled: '+title); }
+  closeModal('newEventModal');
+}
+
+// ── LINK ────────────────────────────────────────────────────────
+document.getElementById('slugInput').addEventListener('input',function(){
+  document.getElementById('linkPreview').textContent='spiritualbeats-listener.html#'+this.value;
+});
+function copyLink(){
+  const slug=document.getElementById('slugInput').value||'sunday-service';
+  const url=location.href.replace('spiritualbeats-broadcaster.html','spiritualbeats-listener.html')+'#'+slug;
+  navigator.clipboard.writeText(url).catch(()=>{});
+  showToast('Link copied!');
+}
+
+// ── VIEW ────────────────────────────────────────────────────────
+function showView(name,el){
+  document.querySelectorAll('.view-pane').forEach(p=>p.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  document.querySelectorAll('.sidebar-item').forEach(i=>i.classList.remove('active'));
+  if(el)el.classList.add('active');
+}
+
+// ── TOAST ───────────────────────────────────────────────────────
+window.showToast=function(msg){
+  const t=document.getElementById('toast');
+  document.getElementById('toastMsg').textContent=msg;
+  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000);
+};
+</script>
+</body>
+</html>
+
