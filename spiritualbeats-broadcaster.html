@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0a0f">
 <title>SpiritualBeats &mdash; Broadcaster Studio</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -140,6 +143,36 @@ code{background:var(--surface3);padding:1px 6px;border-radius:4px;font-family:va
 .svc-desc{font-size:12px;color:var(--muted);line-height:1.6}
 .sync-row{display:flex;gap:10px;align-items:center;font-size:13px;margin-bottom:6px}
 .sync-check{color:var(--green);font-size:14px}
+/* ── MOBILE ──────────────────────────────────────────────────────── */
+@media(max-width:767px){
+  body{overflow-x:hidden;}
+  nav{padding:0 16px;height:52px;}
+  .nav-badge,.fb-pill{display:none;}
+  .layout{grid-template-columns:1fr;height:auto;overflow:visible;}
+  .sidebar,.right-panel{display:none;}
+  .main{overflow:visible;height:auto;}
+  .main-inner{padding:14px;max-width:100%;}
+  .section-title{font-size:18px;}
+  .section-sub{font-size:12px;margin-bottom:16px;}
+  .broadcast-console{border-radius:12px;margin-bottom:16px;}
+  .console-header{flex-wrap:wrap;gap:6px;padding:12px 14px;}
+  .console-body{padding:14px;}
+  .audio-meter{height:28px;margin-bottom:12px;}
+  .meter-bar{width:4px;}
+  .source-tabs{flex-wrap:wrap;gap:4px;margin-bottom:14px;}
+  .source-tab{padding:6px 12px;font-size:11px;}
+  .controls-row{flex-wrap:wrap;gap:8px;padding-top:12px;}
+  .btn{min-height:44px;padding:10px 16px;font-size:13px;}
+  .btn-live{padding:12px 22px;font-size:14px;font-weight:600;}
+  .form-row{grid-template-columns:1fr;}
+  .form-card{padding:14px;border-radius:12px;}
+  .volume-row label{width:44px;}
+  .events-grid{gap:8px;}
+  .event-card{flex-wrap:wrap;gap:8px;padding:12px 14px;}
+  .event-actions{width:100%;justify-content:flex-end;}
+  .status-bar{font-size:10px;}
+  #timerDisplay{font-size:11px;}
+}
 </style>
 </head>
 <body>
