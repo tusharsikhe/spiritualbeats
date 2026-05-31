@@ -489,6 +489,7 @@ let _recs = [];
 // ── WAIT FOR FIREBASE ───────────────────────────────────────────
 window.addEventListener('fb-ready', () => {
   const cfg = window.FB_CONFIGURED;
+  console.log('[SB] fb-ready fired — FB_CONFIGURED:', cfg);
   document.getElementById('fbDot').classList.toggle('ok', cfg);
   document.getElementById('fbTxt').textContent = cfg ? 'Firebase: connected' : 'Firebase: demo mode';
   document.getElementById('dbSt').textContent  = cfg ? 'connected' : 'demo mode';
@@ -598,7 +599,13 @@ async function toggleLive(){
   document.getElementById('timerDisplay').style.display='';
   startTimer();
   const evData={title:document.getElementById('broadcastTitle').value,desc:'',slug:document.getElementById('slugInput').value};
-  if(window.fbSetLive) window.fbSetLive(true,evData);
+  if(window.fbSetLive){
+    window.fbSetLive(true,evData)
+      .then(()=>console.log('[SB] Firebase: isLive=true written OK'))
+      .catch(e=>{ console.error('[SB] Firebase write error (go live):',e); showToast('Warning: Firebase sync failed — '+e.message); });
+  } else {
+    console.warn('[SB] fbSetLive not defined — Firebase module not loaded yet');
+  }
   try{
     if(!mediaStream&&currentSrc==='mic') mediaStream=await navigator.mediaDevices.getUserMedia({audio:true});
     if(mediaStream){
@@ -629,7 +636,11 @@ function stopBroadcast(){
   document.getElementById('readyStatus').style.display='';
   document.getElementById('liveStatus').style.display='none';
   // Tell Firebase we're offline
-  if(window.fbSetLive) window.fbSetLive(false);
+  if(window.fbSetLive){
+    window.fbSetLive(false)
+      .then(()=>console.log('[SB] Firebase: isLive=false written OK'))
+      .catch(e=>console.error('[SB] Firebase write error (stop):',e));
+  }
   showToast('Broadcast ended — saving recording…');
   const title=document.getElementById('broadcastTitle').value||'SpiritualBeats Session';
   // Stop recorder and upload

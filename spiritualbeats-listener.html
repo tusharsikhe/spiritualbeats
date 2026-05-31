@@ -694,11 +694,16 @@ let recordings = [
 // ── FIREBASE INIT ────────────────────────────────────────────────
 window.addEventListener('fb-ready', () => {
   const cfg = window.FB_CONFIGURED;
+  console.log('[SB-Listener] fb-ready fired — FB_CONFIGURED:', cfg);
   const pill = document.getElementById('fbPill');
   pill.textContent = cfg ? 'Live' : 'Demo';
   pill.classList.toggle('ok', cfg);
 
-  if (window.fbWatchLive)   window.fbWatchLive(s   => { liveState = s; setTimeout(renderBanner, 0); });
+  if (window.fbWatchLive)   window.fbWatchLive(s   => {
+    console.log('[SB-Listener] liveState update:', JSON.stringify(s));
+    liveState = s;
+    setTimeout(renderBanner, 0);
+  });
   if (window.fbWatchEvents) window.fbWatchEvents(l  => { schedEvents = l;    renderSchedule(); });
   if (window.fbWatchRecs)   window.fbWatchRecs(l    => { recordings  = l;    renderRecordings(); });
   if (cfg && window.fbJoin) window.fbJoin();
