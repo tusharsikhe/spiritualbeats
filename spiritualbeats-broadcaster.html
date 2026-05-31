@@ -382,7 +382,7 @@ code{background:var(--surface3);padding:1px 6px;border-radius:4px;font-family:va
 <!-- Firebase SDK (ESM) -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, set, onValue, push, remove, serverTimestamp }
+import { getDatabase, ref, set, onValue, push, remove, serverTimestamp, onChildAdded }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { getStorage, ref as sRef, uploadBytes, getDownloadURL }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
@@ -474,6 +474,25 @@ window.fbWatchRecs = (cb) => {
   });
 };
 
+// ── WebRTC signaling ────────────────────────────────────────────
+window.fbListenForPeers = (cb) => {
+  if (!db) return;
+  onChildAdded(ref(db,'channel/webrtc/listeners'), snap => {
+    if (snap.val() && snap.val().request) cb(snap.key);
+  });
+};
+window.fbSendOffer = (lid, offer) => db ? set(ref(db,`channel/webrtc/listeners/${lid}/offer`), offer) : Promise.resolve();
+window.fbWatchAnswer = (lid, cb) => {
+  if (!db) return;
+  onValue(ref(db,`channel/webrtc/listeners/${lid}/answer`), s => { if(s.val()) cb(s.val()); });
+};
+window.fbSendBcIce = (lid, c) => db ? push(ref(db,`channel/webrtc/listeners/${lid}/bcIce`), c) : Promise.resolve();
+window.fbWatchLsIce = (lid, cb) => {
+  if (!db) return;
+  onChildAdded(ref(db,`channel/webrtc/listeners/${lid}/lsIce`), s => { if(s.val()) cb(s.val()); });
+};
+window.fbClearWebrtc = () => { if (db) remove(ref(db,'channel/webrtc')); };
+
 window.FB_CONFIGURED = configured;
 window.dispatchEvent(new Event('fb-ready'));
 </script>
@@ -509,6 +528,36 @@ window.addEventListener('fb-ready', () => {
 let isLive=false, timerSec=0, timerInt=null, meterRAF=null;
 let audioCtx=null, mediaStream=null, analyser=null, recorder=null, chunks=[];
 let currentSrc='mic';
+
+// ── WebRTC (broadcaster) ─────────────────────────────────────────
+const STUN=[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}];
+let pcs={};
+
+function setupPeerListener(){
+  if(!window.fbListenForPeers||!mediaStream) return;
+  window.fbListenForPeers(async lid=>{
+    if(pcs[lid]) return;
+    const pc=new RTCPeerConnection({iceServers:STUN});
+    pcs[lid]=pc;
+    mediaStream.getTracks().forEach(t=>pc.addTrack(t,mediaStream));
+    pc.onicecandidate=e=>{ if(e.candidate) window.fbSendBcIce(lid,e.candidate.toJSON()); };
+    window.fbWatchLsIce(lid,async json=>{try{await pc.addIceCandidate(new RTCIceCandidate(json));}catch(e){}});
+    const offer=await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    await window.fbSendOffer(lid,{sdp:offer.sdp,type:offer.type});
+    window.fbWatchAnswer(lid,async ans=>{
+      if(pc.signalingState!=='have-local-offer') return;
+      try{await pc.setRemoteDescription(new RTCSessionDescription(ans));}catch(e){}
+    });
+    pc.onconnectionstatechange=()=>console.log(`[BC] peer ${lid}:`,pc.connectionState);
+  });
+}
+
+function closeAllPeers(){
+  Object.values(pcs).forEach(pc=>{try{pc.close();}catch(e){}});
+  pcs={};
+  if(window.fbClearWebrtc) window.fbClearWebrtc();
+}
 
 // ── METER ───────────────────────────────────────────────────────
 function buildMeter(){
@@ -615,6 +664,7 @@ async function toggleLive(){
       recorder=new MediaRecorder(mediaStream); chunks=[];
       recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
       recorder.start(1000);
+      setupPeerListener();
     }
   }catch(e){}
   animateMeter(true,analyser);
@@ -627,6 +677,7 @@ function stopBroadcast(){
   isLive=false;
   cancelAnimationFrame(meterRAF);
   stopTimer();
+  closeAllPeers();
   // Reset UI immediately so user knows it worked
   document.getElementById('goLiveBtn').style.display='';
   document.getElementById('stopBtn').style.display='none';

@@ -631,7 +631,7 @@ nav {
 <!-- ── FIREBASE SDK ────────────────────────────────────────────── -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, onValue }
+import { getDatabase, ref, onValue, onChildAdded, push, remove, set }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 // ================================================================
@@ -674,6 +674,23 @@ window.fbWatchRecs = cb => {
 // Listener count writes removed — blocked by security rules
 window.fbJoin = () => {};
 
+// ── WebRTC signaling ────────────────────────────────────────────
+window.fbRegisterListener = (lid) => {
+  if (!db) return Promise.resolve(false);
+  return set(ref(db,`channel/webrtc/listeners/${lid}/request`), true).then(()=>true).catch(()=>false);
+};
+window.fbWatchOffer = (lid, cb) => {
+  if (!db) return;
+  onValue(ref(db,`channel/webrtc/listeners/${lid}/offer`), s => { if(s.val()) cb(s.val()); });
+};
+window.fbSendAnswer = (lid, ans) => db ? set(ref(db,`channel/webrtc/listeners/${lid}/answer`), ans) : Promise.resolve();
+window.fbSendLsIce = (lid, c) => db ? push(ref(db,`channel/webrtc/listeners/${lid}/lsIce`), c) : Promise.resolve();
+window.fbWatchBcIce = (lid, cb) => {
+  if (!db) return;
+  onChildAdded(ref(db,`channel/webrtc/listeners/${lid}/bcIce`), s => { if(s.val()) cb(s.val()); });
+};
+window.fbRemoveListener = (lid) => { if (db) remove(ref(db,`channel/webrtc/listeners/${lid}`)); };
+
 window.FB_CONFIGURED = configured;
 window.dispatchEvent(new Event('fb-ready'));
 </script>
@@ -690,6 +707,52 @@ let recordings = [
   {id:'r1',title:'Friday Prayer Night',date:'May 30, 2026',dur:'58m',  durSec:3480,emoji:'&#128591;'},
   {id:'r2',title:'Sunday Service',     date:'May 24, 2026',dur:'1h 12m',durSec:4320,emoji:'&#127929;'},
 ];
+
+// ── WebRTC (listener) ────────────────────────────────────────────
+const STUN=[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}];
+let lsPc=null, lsId=null, lsAudio=null;
+
+async function startLiveAudio(){
+  if(!window.FB_CONFIGURED||!window.fbRegisterListener){
+    showToast('Live audio unavailable — Firebase not connected');
+    return;
+  }
+  if(lsPc) return; // already connected
+  lsId=Date.now().toString(36)+Math.random().toString(36).slice(2);
+  lsPc=new RTCPeerConnection({iceServers:STUN});
+  lsAudio=document.createElement('audio');
+  lsAudio.autoplay=true;
+  lsPc.ontrack=e=>{
+    lsAudio.srcObject=e.streams[0];
+    lsAudio.play()
+      .then(()=>showToast('Connected — listening live 🔊'))
+      .catch(()=>showToast('Tap play again to start audio'));
+  };
+  lsPc.onicecandidate=e=>{ if(e.candidate) window.fbSendLsIce(lsId,e.candidate.toJSON()); };
+  lsPc.onconnectionstatechange=()=>{
+    console.log('[LI] WebRTC:',lsPc.connectionState);
+    if(lsPc.connectionState==='failed'||lsPc.connectionState==='disconnected')
+      showToast('Stream disconnected — broadcaster may have stopped');
+  };
+  await window.fbRegisterListener(lsId);
+  window.fbWatchOffer(lsId,async offer=>{
+    if(!lsPc||lsPc.signalingState!=='stable') return;
+    await lsPc.setRemoteDescription(new RTCSessionDescription(offer));
+    const ans=await lsPc.createAnswer();
+    await lsPc.setLocalDescription(ans);
+    await window.fbSendAnswer(lsId,{sdp:ans.sdp,type:ans.type});
+  });
+  window.fbWatchBcIce(lsId,async json=>{
+    try{if(lsPc)await lsPc.addIceCandidate(new RTCIceCandidate(json));}catch(e){}
+  });
+  showToast('Connecting to live stream…');
+}
+
+function stopLiveAudio(){
+  if(lsAudio){lsAudio.pause();lsAudio.srcObject=null;lsAudio=null;}
+  if(lsPc){lsPc.close();lsPc=null;}
+  if(lsId){if(window.fbRemoveListener)window.fbRemoveListener(lsId);lsId=null;}
+}
 
 // ── FIREBASE INIT ────────────────────────────────────────────────
 window.addEventListener('fb-ready', () => {
@@ -811,8 +874,14 @@ function toggleMainPlay(){
   const track=document.getElementById('mainTrack');
   if(icon) icon.innerHTML=mainPlaying?PAUSE_SVG:PLAY_SVG;
   if(track) track.textContent=mainPlaying?(liveState&&liveState.title?liveState.title+' \u00b7 Live':'Live'):'Tap play to tune in';
-  if(mainPlaying){ showPb(liveState&&liveState.title?liveState.title:'Live Stream','&#128308; Live now'); updatePbIcon(true); }
-  else closePb();
+  if(mainPlaying){
+    showPb(liveState&&liveState.title?liveState.title:'Live Stream','&#128308; Live now');
+    updatePbIcon(true);
+    startLiveAudio();
+  } else {
+    if(lsAudio) lsAudio.pause();
+    closePb();
+  }
 }
 
 // ── RECORDINGS ───────────────────────────────────────────────────
@@ -953,6 +1022,7 @@ function closePb(){
   document.getElementById('playerBar').classList.remove('show');
   if(activeAudio){activeAudio.pause();activeAudio=null;}
   if(activeId)_stopRec(activeId);
+  stopLiveAudio();
   activeId=null; pbPlaying=false; mainPlaying=false;
 }
 function updatePbIcon(p){ document.getElementById('pbIcon').innerHTML=p?PAUSE_SVG:PLAY_SVG; }
