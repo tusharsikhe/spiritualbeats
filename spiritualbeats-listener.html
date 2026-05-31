@@ -710,23 +710,40 @@ let recordings = [
 
 // ── WebRTC (listener) ────────────────────────────────────────────
 const STUN=[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}];
-let lsPc=null, lsId=null, lsAudio=null;
+let lsPc=null, lsId=null, lsAudio=null, lsAudioCtx=null, lsAudioSrc=null;
 
 async function startLiveAudio(){
   if(!window.FB_CONFIGURED||!window.fbRegisterListener){
     showToast('Live audio unavailable — Firebase not connected');
     return;
   }
-  if(lsPc) return; // already connected
+  if(lsPc) return;
   lsId=Date.now().toString(36)+Math.random().toString(36).slice(2);
-  lsPc=new RTCPeerConnection({iceServers:STUN});
+
+  // ── iOS Safari fix: unlock AudioContext during the user gesture ──
+  // ontrack fires asynchronously, so audio.play() called there is
+  // blocked by iOS. Creating + resuming an AudioContext HERE (in the
+  // tap handler) unlocks it; we then route the stream through it.
+  lsAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  if(lsAudioCtx.state==='suspended') await lsAudioCtx.resume();
+
   lsAudio=document.createElement('audio');
   lsAudio.autoplay=true;
+  lsAudio.setAttribute('playsinline',''); // prevent iOS fullscreen takeover
+
+  lsPc=new RTCPeerConnection({iceServers:STUN});
   lsPc.ontrack=e=>{
-    lsAudio.srcObject=e.streams[0];
-    lsAudio.play()
-      .then(()=>showToast('Connected — listening live 🔊'))
-      .catch(()=>showToast('Tap play again to start audio'));
+    const stream=e.streams[0];
+    lsAudio.srcObject=stream;
+    // Route through the already-unlocked AudioContext (works on iOS)
+    try{
+      if(lsAudioSrc) lsAudioSrc.disconnect();
+      lsAudioSrc=lsAudioCtx.createMediaStreamSource(stream);
+      lsAudioSrc.connect(lsAudioCtx.destination);
+    }catch(err){}
+    // Also attempt native play as a fallback for other browsers
+    lsAudio.play().catch(()=>{});
+    showToast('Connected — listening live 🔊');
   };
   lsPc.onicecandidate=e=>{ if(e.candidate) window.fbSendLsIce(lsId,e.candidate.toJSON()); };
   lsPc.onconnectionstatechange=()=>{
@@ -749,6 +766,8 @@ async function startLiveAudio(){
 }
 
 function stopLiveAudio(){
+  if(lsAudioSrc){try{lsAudioSrc.disconnect();}catch(e){}lsAudioSrc=null;}
+  if(lsAudioCtx){lsAudioCtx.close();lsAudioCtx=null;}
   if(lsAudio){lsAudio.pause();lsAudio.srcObject=null;lsAudio=null;}
   if(lsPc){lsPc.close();lsPc=null;}
   if(lsId){if(window.fbRemoveListener)window.fbRemoveListener(lsId);lsId=null;}
