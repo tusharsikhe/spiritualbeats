@@ -559,7 +559,7 @@ nav {
 
 <!-- NAV -->
 <nav>
-  <div class="nav-logo"><span class="logo-cross">&#10013;</span> SpiritualBeats</div>
+  <div class="nav-logo"><span class="logo-cross">🕉</span> SpiritualBeats</div>
   <div class="nav-right">
     <div class="live-nav-pill" id="liveNavPill"><span class="pulse"></span> Live</div>
     <div class="fb-pill" id="fbPill">Demo</div>
@@ -703,10 +703,7 @@ let schedEvents = [
   {title:'Sunday Service',    date:'2026-06-07',time:'10:00',desc:'Weekly worship and word'},
   {title:'Friday Prayer Night',date:'2026-06-12',time:'19:00',desc:'Community prayer'},
 ];
-let recordings = [
-  {id:'r1',title:'Friday Prayer Night',date:'May 30, 2026',dur:'58m',  durSec:3480,emoji:'&#128591;'},
-  {id:'r2',title:'Sunday Service',     date:'May 24, 2026',dur:'1h 12m',durSec:4320,emoji:'&#127929;'},
-];
+let recordings = [];
 
 // ── WebRTC (listener) ────────────────────────────────────────────
 const STUN=[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}];
@@ -910,7 +907,7 @@ function renderRecordings(){
   const grid=document.getElementById('recCards');
   const empty=document.getElementById('emptyRec');
   const recs=recordings||[];
-  empty.style.display=recs.length?'none':'';
+  empty.style.display=recs.length?'none':'block';
   grid.innerHTML='';
   recs.forEach((r,i)=>{
     const rid=r.fbId||r.id;
@@ -1005,7 +1002,7 @@ function ipSeek(e,id,total){
 }
 function pbBarSeek(e){
   if(!activeId)return;
-  const rec=recordings.find(r=>String(r.id)===String(activeId)); if(!rec)return;
+  const rec=recordings.find(r=>String(r.fbId||r.id)===String(activeId)); if(!rec)return;
   const rect=e.currentTarget.getBoundingClientRect();
   const pct=(e.clientX-rect.left)/rect.width;
   recProg[activeId]=Math.floor(pct*(rec.durSec||0));

@@ -178,7 +178,7 @@ code{background:var(--surface3);padding:1px 6px;border-radius:4px;font-family:va
 <body>
 
 <nav>
-  <div class="nav-logo"><span class="logo-cross">&#10013;</span> SpiritualBeats</div>
+  <div class="nav-logo"><span class="logo-cross">🕉</span> SpiritualBeats</div>
   <div style="display:flex;align-items:center;gap:14px;">
     <div class="live-indicator" id="liveIndicator" style="display:none;"><span class="pulse-dot"></span> LIVE</div>
     <div class="fb-pill"><span class="fb-dot" id="fbDot"></span><span id="fbTxt">Firebase: demo mode</span></div>
@@ -186,7 +186,7 @@ code{background:var(--surface3);padding:1px 6px;border-radius:4px;font-family:va
   </div>
   <div class="nav-actions">
     <button class="btn btn-ghost btn-sm" onclick="openShareModal()">Share listener link</button>
-    <div style="width:32px;height:32px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:14px;">&#10013;</div>
+    <div style="width:32px;height:32px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:14px;">🕉</div>
   </div>
 </nav>
 
@@ -481,21 +481,26 @@ window.fbRemoveEvent = async (fbId) => {
 // ── Upload recording blob -> Storage, then save metadata ───────
 window.fbUploadRec = async (blob, title, durSec) => {
   if (!storage || !db) {
-    // Local fallback
     window._addRec(title, URL.createObjectURL(blob), window.formatDur(durSec));
     return;
   }
-  window.showToast('Uploading to Firebase Storage\u2026');
-  const path = 'recordings/' + Date.now() + '_' + title.replace(/\s+/g,'-') + '.webm';
-  await uploadBytes(sRef(storage, path), blob);
-  const url = await getDownloadURL(sRef(storage, path));
-  await push(ref(db,'recordings'), {
-    title, url,
-    date: new Date().toLocaleDateString('en-AU',{month:'short',day:'numeric',year:'numeric'}),
-    dur: window.formatDur(durSec), durSec,
-    createdAt: serverTimestamp()
-  });
-  window.showToast('Recording saved to Firebase \u2713');
+  window.showToast('Uploading recording\u2026');
+  try {
+    const path = 'recordings/' + Date.now() + '_' + title.replace(/\s+/g,'-') + '.webm';
+    await uploadBytes(sRef(storage, path), blob);
+    const url = await getDownloadURL(sRef(storage, path));
+    await push(ref(db,'recordings'), {
+      title, url,
+      date: new Date().toLocaleDateString('en-AU',{month:'short',day:'numeric',year:'numeric'}),
+      dur: window.formatDur(durSec), durSec,
+      createdAt: serverTimestamp()
+    });
+    window.showToast('Recording saved to Firebase \u2713');
+  } catch(e) {
+    console.error('[SB] Storage upload failed:', e);
+    window.showToast('Firebase upload failed \u2014 saving locally\u2026');
+    throw e;
+  }
 };
 
 // ── Real-time recordings feed ──────────────────────────────────
@@ -689,17 +694,34 @@ async function toggleLive(){
     console.warn('[SB] fbSetLive not defined — Firebase module not loaded yet');
   }
   try{
-    if(!mediaStream&&currentSrc==='mic') mediaStream=await navigator.mediaDevices.getUserMedia({audio:true});
-    if(mediaStream){
+    if(currentSrc==='file'){
+      const fileInput=document.getElementById('audioFileInput');
+      if(!fileInput.files[0]){ showToast('Please select an audio file first'); stopBroadcast(); return; }
+      audioCtx=new AudioContext();
+      const dest=audioCtx.createMediaStreamDestination();
+      analyser=audioCtx.createAnalyser(); analyser.fftSize=256;
+      const arrayBuf=await fileInput.files[0].arrayBuffer();
+      const decoded=await audioCtx.decodeAudioData(arrayBuf);
+      const fileSrc=audioCtx.createBufferSource();
+      fileSrc.buffer=decoded;
+      fileSrc.connect(analyser);
+      fileSrc.connect(dest);
+      fileSrc.connect(audioCtx.destination); // monitor locally
+      fileSrc.start();
+      mediaStream=dest.stream;
+    } else {
+      if(!mediaStream) mediaStream=await navigator.mediaDevices.getUserMedia({audio:true});
       audioCtx=new AudioContext();
       const src=audioCtx.createMediaStreamSource(mediaStream);
       analyser=audioCtx.createAnalyser(); analyser.fftSize=256; src.connect(analyser);
+    }
+    if(mediaStream){
       recorder=new MediaRecorder(mediaStream); chunks=[];
       recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
       recorder.start(1000);
       setupPeerListener();
     }
-  }catch(e){}
+  }catch(e){ console.error('[SB] Audio setup error:',e); showToast('Audio error: '+e.message); }
   animateMeter(true,analyser);
   showToast('You are now live on SpiritualBeats!');
 }
@@ -727,19 +749,34 @@ function stopBroadcast(){
   }
   showToast('Broadcast ended — saving recording…');
   const title=document.getElementById('broadcastTitle').value||'SpiritualBeats Session';
-  // Stop recorder and upload
+  const capturedSec=timerSec;
+  // Stop recorder and upload — assign onstop BEFORE calling stop()
   try {
     if(recorder&&recorder.state!=='inactive'){
-      recorder.stop();
       recorder.onstop=()=>{
         const blob=new Blob(chunks,{type:'audio/webm'});
-        if(window.fbUploadRec) window.fbUploadRec(blob,title,timerSec);
-        else window._addRec(title,URL.createObjectURL(blob),window.formatDur(timerSec));
+        if(window.fbUploadRec){
+          window.fbUploadRec(blob,title,capturedSec).catch(()=>{
+            // Firebase upload failed — offer local download
+            const a=document.createElement('a');
+            a.href=URL.createObjectURL(blob);
+            a.download=title.replace(/\s+/g,'-')+'.webm';
+            a.click();
+            window._addRec(title,URL.createObjectURL(blob),window.formatDur(capturedSec));
+          });
+        } else {
+          // No Firebase — download locally and add to list
+          const url=URL.createObjectURL(blob);
+          const a=document.createElement('a');
+          a.href=url; a.download=title.replace(/\s+/g,'-')+'.webm'; a.click();
+          window._addRec(title,url,window.formatDur(capturedSec));
+        }
       };
+      recorder.stop();
     } else {
-      window._addRec(title,null,window.formatDur(timerSec));
+      window._addRec(title,null,window.formatDur(capturedSec));
     }
-  } catch(e){ console.error('Recorder stop error:',e); }
+  } catch(e){ console.error('Recorder stop error:',e); showToast('Recording error: '+e.message); }
   // Stop mic stream
   try {
     if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}
