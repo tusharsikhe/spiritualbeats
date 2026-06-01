@@ -311,13 +311,13 @@ code{background:var(--surface3);padding:1px 6px;border-radius:4px;font-family:va
             <button class="btn btn-ghost btn-sm" onclick="showView('schedule',document.querySelectorAll('.sidebar-item')[1])">+ New event</button>
           </div>
           <div class="form-row">
-            <div class="form-group"><label>Event Name</label><input type="text" id="broadcastTitle" value="Sunday Service"></div>
-            <div class="form-group"><label>Listener Link Slug</label><input type="text" id="slugInput" value="sunday-service"></div>
+            <div class="form-group"><label>Event Name</label><input type="text" id="broadcastTitle" placeholder="e.g. Sunday Service"></div>
+            <div class="form-group"><label>Listener Link Slug</label><input type="text" id="slugInput" placeholder="e.g. sunday-service"></div>
           </div>
-          <div class="form-group form-full"><label>Description</label><textarea>Weekly worship and word &#128591;</textarea></div>
+          <div class="form-group form-full"><label>Description</label><textarea placeholder="e.g. Weekly worship and word"></textarea></div>
           <div style="margin-top:8px;">
             <div class="panel-head">Listener link</div>
-            <div class="link-box"><div class="link-url" id="linkPreview">spiritualbeats-listener.html#sunday-service</div><button class="btn btn-ghost btn-sm" onclick="copyLink()">Copy</button></div>
+            <div class="link-box"><div class="link-url" id="linkPreview">spiritualbeats-listener.html#</div><button class="btn btn-ghost btn-sm" onclick="copyLink()">Copy</button></div>
           </div>
         </div>
       </div>
@@ -537,7 +537,7 @@ window.fbRemoveEvent = async (fbId) => {
 
 // ── Upload recording blob -> Storage (or RTDB base64 fallback) ─
 window.fbUploadRec = async (blob, title, durSec) => {
-  const date = new Date().toLocaleDateString('en-AU',{month:'short',day:'numeric',year:'numeric'});
+  const date = new Date().toLocaleDateString('en-AU',{month:'short',day:'numeric',year:'numeric',timeZone:'Australia/Brisbane'});
   const dur  = window.formatDur(durSec);
 
   // No Firebase at all — local only
@@ -633,11 +633,11 @@ window.dispatchEvent(new Event('fb-ready'));
 </script>
 
 <script>
+// ── TIMEZONE ────────────────────────────────────────────────────
+const TZ = 'Australia/Brisbane'; // AEST UTC+10, no daylight saving
+
 // ── LOCAL SEED DATA ─────────────────────────────────────────────
-let _events = [
-  {id:'local-1',title:'Sunday Service',slug:'sunday-service',date:'2026-06-07',time:'10:00',desc:'Weekly worship and word',status:'scheduled'},
-  {id:'local-2',title:'Friday Prayer Night',slug:'friday-prayer',date:'2026-05-30',time:'19:00',desc:'Community prayer',status:'done',duration:'58m'},
-];
+let _events = [];
 let _recs = [];
 
 // ── WAIT FOR FIREBASE ───────────────────────────────────────────
@@ -908,7 +908,7 @@ window._warnStorageRules=function(){
 
 // ── RECORDINGS ──────────────────────────────────────────────────
 window._addRec=function(title,url,dur){
-  _recs.unshift({title,url,dur,date:new Date().toLocaleDateString('en-AU',{month:'short',day:'numeric',year:'numeric'})});
+  _recs.unshift({title,url,dur,date:new Date().toLocaleDateString('en-AU',{month:'short',day:'numeric',year:'numeric',timeZone:TZ})});
   renderRecs(); document.getElementById('totalRec').textContent=_recs.length;
 };
 
@@ -945,9 +945,10 @@ renderRecs();
 function renderEvents(){
   const g=document.getElementById('eventsGrid'); g.innerHTML='';
   _events.forEach(ev=>{
-    const d=new Date(ev.date+'T'+ev.time);
-    const day=d.getDate(),mon=d.toLocaleString('en',{month:'short'}).toUpperCase();
-    const ts=d.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'});
+    const d=new Date(ev.date+'T'+ev.time+'+10:00');
+    const day=d.toLocaleString('en-AU',{day:'numeric',timeZone:TZ});
+    const mon=d.toLocaleString('en-AU',{month:'short',timeZone:TZ}).toUpperCase();
+    const ts=d.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',timeZone:TZ});
     const tc=ev.status==='live'?'live-tag':ev.status==='scheduled'?'sched-tag':'done-tag';
     const tl=ev.status==='live'?'LIVE':ev.status==='scheduled'?'Scheduled':'Recorded';
     const c=document.createElement('div'); c.className='event-card';
@@ -966,7 +967,7 @@ function delEvent(id){
 
 // ── MODALS ──────────────────────────────────────────────────────
 function openShareModal(){
-  const slug=document.getElementById('slugInput').value||'sunday-service';
+  const slug=document.getElementById('slugInput').value||'';
   document.getElementById('modalLink').textContent='spiritualbeats-listener.html#'+slug;
   document.getElementById('shareModal').classList.add('open');
 }
@@ -991,7 +992,7 @@ document.getElementById('slugInput').addEventListener('input',function(){
   document.getElementById('linkPreview').textContent='spiritualbeats-listener.html#'+this.value;
 });
 function copyLink(){
-  const slug=document.getElementById('slugInput').value||'sunday-service';
+  const slug=document.getElementById('slugInput').value||'';
   const url=location.href.replace('spiritualbeats-broadcaster.html','spiritualbeats-listener.html')+'#'+slug;
   navigator.clipboard.writeText(url).catch(()=>{});
   showToast('Link copied!');

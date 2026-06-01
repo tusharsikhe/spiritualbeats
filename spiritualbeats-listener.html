@@ -697,12 +697,12 @@ window.dispatchEvent(new Event('fb-ready'));
 
 <!-- ── APP LOGIC ──────────────────────────────────────────────── -->
 <script>
+// ── TIMEZONE ────────────────────────────────────────────────────
+const TZ = 'Australia/Brisbane'; // AEST UTC+10, no daylight saving
+
 // ── DEMO DATA ───────────────────────────────────────────────────
 let liveState   = null;
-let schedEvents = [
-  {title:'Sunday Service',    date:'2026-06-07',time:'10:00',desc:'Weekly worship and word'},
-  {title:'Friday Prayer Night',date:'2026-06-12',time:'19:00',desc:'Community prayer'},
-];
+let schedEvents = [];
 let recordings = [];
 
 // ── WebRTC (listener) ────────────────────────────────────────────
@@ -844,18 +844,18 @@ function renderBanner(){
 }
 
 function upcomingHTML(ev){
-  const d=new Date(ev.date+'T'+ev.time);
+  const d=new Date(ev.date+'T'+ev.time+'+10:00');
   return `<div class="upcoming-card">
-    <div class="udate"><div class="uday">${d.getDate()}</div><div class="umon">${d.toLocaleString('en',{month:'short'}).toUpperCase()}</div></div>
-    <div class="uinfo"><div class="utitle">${ev.title}</div><div class="utime">${d.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})} &middot; Scheduled</div></div>
+    <div class="udate"><div class="uday">${d.toLocaleString('en-AU',{day:'numeric',timeZone:TZ})}</div><div class="umon">${d.toLocaleString('en-AU',{month:'short',timeZone:TZ}).toUpperCase()}</div></div>
+    <div class="uinfo"><div class="utitle">${ev.title}</div><div class="utime">${d.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',timeZone:TZ})} &middot; Scheduled</div></div>
     <div class="countdown" id="countdown">...</div>
   </div>`;
 }
-function getNext(){ return (schedEvents||[]).find(e=>new Date(e.date+'T'+e.time)>new Date())||null; }
+function getNext(){ return (schedEvents||[]).find(e=>new Date(e.date+'T'+e.time+'+10:00')>new Date())||null; }
 function updateCountdown(){
   const el=document.getElementById('countdown'); if(!el)return;
   const next=getNext(); if(!next)return;
-  const diff=new Date(next.date+'T'+next.time)-new Date();
+  const diff=new Date(next.date+'T'+next.time+'+10:00')-new Date();
   if(diff<=0){el.textContent='Soon!';return;}
   const d=Math.floor(diff/86400000),h=Math.floor((diff%86400000)/3600000),m=Math.floor((diff%3600000)/60000),s=Math.floor((diff%60000)/1000);
   el.textContent=d>0?d+'d '+h+'h':h>0?h+'h '+m+'m':m+'m '+s+'s';
@@ -1027,11 +1027,11 @@ function renderSchedule(){
   document.getElementById('emptySched').style.display=evs.length?'none':'';
   list.innerHTML='';
   evs.forEach(ev=>{
-    const d=new Date(ev.date+'T'+ev.time);
+    const d=new Date(ev.date+'T'+ev.time+'+10:00');
     const item=document.createElement('div'); item.className='sched-item';
     item.innerHTML=`
-<div class="sbadge"><div class="sd">${d.getDate()}</div><div class="sm">${d.toLocaleString('en',{month:'short'}).toUpperCase()}</div></div>
-<div class="sinfo"><div class="stitle">${ev.title}</div><div class="stime">${d.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})} &middot; ${ev.desc||''}</div></div>
+<div class="sbadge"><div class="sd">${d.toLocaleString('en-AU',{day:'numeric',timeZone:TZ})}</div><div class="sm">${d.toLocaleString('en-AU',{month:'short',timeZone:TZ}).toUpperCase()}</div></div>
+<div class="sinfo"><div class="stitle">${ev.title}</div><div class="stime">${d.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',timeZone:TZ})} &middot; ${ev.desc||''}</div></div>
 <button class="sbtn" onclick="showToast('Reminder set!')">Remind me</button>`;
     list.appendChild(item);
   });
