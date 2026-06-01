@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -329,8 +329,15 @@ code{background:var(--surface3);padding:1px 6px;border-radius:4px;font-family:va
         <div class="form-card">
           <div style="font-family:var(--font-head);font-size:15px;font-weight:600;margin-bottom:14px;">Enable in Firebase Console</div>
           <div class="svc-card"><div class="svc-icon">&#128225;</div><div><div class="svc-title">Realtime Database</div><div class="svc-desc">Build &rarr; Realtime Database &rarr; Create Database &rarr; Start in test mode. Syncs live on/off state and scheduled events to all listener tabs instantly.</div></div></div>
-          <div class="svc-card"><div class="svc-icon">&#128452;</div><div><div class="svc-title">Firebase Storage</div><div class="svc-desc">Build &rarr; Storage &rarr; Get started &rarr; Start in test mode. Stores recorded .webm audio files. Free tier: 5 GB storage, 1 GB/day download.</div></div></div>
-          <div class="svc-card"><div class="svc-icon">&#128274;</div><div><div class="svc-title">Security Rules (do this before sharing)</div><div class="svc-desc">Once tested, lock down DB and Storage so only you (the broadcaster) can write. Ask me to generate the exact rules file for your project.</div></div></div>
+          <div class="svc-card"><div class="svc-icon">&#128452;</div><div><div class="svc-title">Firebase Storage</div><div class="svc-desc">Build &rarr; Storage &rarr; Get started &rarr; Start in test mode. Stores recorded .webm audio files. Free tier: 5 GB storage, 1 GB/day download.<br><br><strong style="color:var(--amber);">&#9888; Test-mode rules expire after 30 days.</strong> If recordings download locally but don't appear in the app, your rules have expired. Fix them by going to <strong style="color:var(--text);">Firebase Console &rarr; Storage &rarr; Rules</strong> and replacing everything with:<br><br><code style="display:block;margin-top:8px;padding:10px;background:var(--surface3);border-radius:6px;font-size:11px;line-height:1.7;white-space:pre;">rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /recordings/{file} {
+      allow read, write: if true;
+    }
+  }
+}</code><br>Then click <strong style="color:var(--text);">Publish</strong>.</div></div></div>
+          <div class="svc-card"><div class="svc-icon">&#128274;</div><div><div class="svc-title">Security Rules (do this before sharing publicly)</div><div class="svc-desc">The rules above allow anyone to upload. For a private congregation this is fine — only people you share the broadcaster link with can upload. If you want stricter control, add Firebase Auth and require sign-in.</div></div></div>
         </div>
 
         <div class="form-card">
@@ -478,31 +485,62 @@ window.fbRemoveEvent = async (fbId) => {
   await remove(ref(db,'events/'+fbId));
 };
 
-// ── Upload recording blob -> Storage, then save metadata ───────
+// ── Upload recording blob -> Storage (or RTDB base64 fallback) ─
 window.fbUploadRec = async (blob, title, durSec) => {
-  if (!storage || !db) {
-    window._addRec(title, URL.createObjectURL(blob), window.formatDur(durSec));
+  const date = new Date().toLocaleDateString('en-AU',{month:'short',day:'numeric',year:'numeric'});
+  const dur  = window.formatDur(durSec);
+
+  // No Firebase at all — local only
+  if (!db) {
+    const u = URL.createObjectURL(blob);
+    window._addRec(title, u, dur);
+    window._dlBlob(u, title);
     return;
   }
-  window.showToast('Uploading recording\u2026');
-  try {
-    const path = 'recordings/' + Date.now() + '_' + title.replace(/\s+/g,'-') + '.webm';
-    await uploadBytes(sRef(storage, path), blob);
-    const url = await getDownloadURL(sRef(storage, path));
-    await push(ref(db,'recordings'), {
-      title, url,
-      date: new Date().toLocaleDateString('en-AU',{month:'short',day:'numeric',year:'numeric'}),
-      dur: window.formatDur(durSec), durSec,
-      createdAt: serverTimestamp()
-    });
-    window.showToast('Recording saved to Firebase \u2713');
-  } catch(e) {
-    console.error('[SB] Storage upload failed:', e);
-    window.showToast('Firebase upload failed \u2014 saving locally\u2026');
-    throw e;
-  }
-};
 
+  // Step 1: write placeholder to RTDB immediately so both apps see the recording
+  const meta = { title, date, dur, durSec, url: null, status: 'uploading', createdAt: serverTimestamp() };
+  const recRef = await push(ref(db, 'recordings'), meta);
+
+  // Step 2: try Firebase Storage
+  if (storage) {
+    try {
+      window.showToast('Uploading to Firebase Storage...');
+      const path = 'recordings/' + Date.now() + '_' + title.replace(/\s+/g,'-') + '.webm';
+      await uploadBytes(sRef(storage, path), blob);
+      const url = await getDownloadURL(sRef(storage, path));
+      await set(recRef, { title, date, dur, durSec, url, status: 'ready', createdAt: serverTimestamp() });
+      window.showToast('Recording saved to Firebase');
+      return;
+    } catch(e) {
+      console.error('[SB] Storage upload failed:', e.code, e.message);
+      const expired = e.code === 'storage/unauthorized';
+      window.showToast(expired
+        ? 'Storage rules expired - see Firebase Setup tab'
+        : 'Storage upload failed: ' + (e.code||e.message));
+      if (expired) window._warnStorageRules();
+    }
+  }
+
+  // Step 3: base64 fallback for recordings <= 2 MB (~4 min of audio)
+  if (blob.size <= 2097152) {
+    window.showToast('Saving recording inline...');
+    const dataUrl = await new Promise((res,rej) => {
+      const fr = new FileReader();
+      fr.onload = () => res(fr.result);
+      fr.onerror = rej;
+      fr.readAsDataURL(blob);
+    });
+    await set(recRef, { title, date, dur, durSec, url: dataUrl, status: 'ready', createdAt: serverTimestamp() });
+    window.showToast('Recording saved (inline mode)');
+    return;
+  }
+
+  // Step 4: too large for inline — mark failed, download locally
+  await set(recRef, { title, date, dur, durSec, url: null, status: 'failed', createdAt: serverTimestamp() });
+  window.showToast('Fix Firebase Storage rules to sync long recordings');
+  window._dlBlob(URL.createObjectURL(blob), title);
+};
 // ── Real-time recordings feed ──────────────────────────────────
 window.fbWatchRecs = (cb) => {
   if (!db) { cb([]); return; }
@@ -750,26 +788,18 @@ function stopBroadcast(){
   showToast('Broadcast ended — saving recording…');
   const title=document.getElementById('broadcastTitle').value||'SpiritualBeats Session';
   const capturedSec=timerSec;
-  // Stop recorder and upload — assign onstop BEFORE calling stop()
+  // Stop recorder and upload — onstop assigned BEFORE stop()
   try {
     if(recorder&&recorder.state!=='inactive'){
       recorder.onstop=()=>{
         const blob=new Blob(chunks,{type:'audio/webm'});
         if(window.fbUploadRec){
-          window.fbUploadRec(blob,title,capturedSec).catch(()=>{
-            // Firebase upload failed — offer local download
-            const a=document.createElement('a');
-            a.href=URL.createObjectURL(blob);
-            a.download=title.replace(/\s+/g,'-')+'.webm';
-            a.click();
-            window._addRec(title,URL.createObjectURL(blob),window.formatDur(capturedSec));
-          });
+          window.fbUploadRec(blob,title,capturedSec)
+            .catch(e=>console.error('[SB] fbUploadRec unexpected error:',e));
         } else {
-          // No Firebase — download locally and add to list
-          const url=URL.createObjectURL(blob);
-          const a=document.createElement('a');
-          a.href=url; a.download=title.replace(/\s+/g,'-')+'.webm'; a.click();
-          window._addRec(title,url,window.formatDur(capturedSec));
+          const u=URL.createObjectURL(blob);
+          window._dlBlob(u,title);
+          window._addRec(title,u,window.formatDur(capturedSec));
         }
       };
       recorder.stop();
@@ -777,12 +807,23 @@ function stopBroadcast(){
       window._addRec(title,null,window.formatDur(capturedSec));
     }
   } catch(e){ console.error('Recorder stop error:',e); showToast('Recording error: '+e.message); }
-  // Stop mic stream
+    // Stop mic stream
   try {
     if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}
     if(audioCtx){audioCtx.close();audioCtx=null;}
   } catch(e){ console.error('Stream cleanup error:',e); }
 }
+
+// ── HELPERS ─────────────────────────────────────────────────────
+window._dlBlob=function(url,title){
+  const a=document.createElement('a');
+  a.href=url; a.download=title.replace(/\s+/g,'-')+'.webm'; a.click();
+};
+window._warnStorageRules=function(){
+  document.getElementById('stSt').textContent='Rules expired!';
+  document.getElementById('stSt').style.color='var(--live)';
+  showToast('Open Firebase Setup tab — Storage rules need updating');
+};
 
 // ── RECORDINGS ──────────────────────────────────────────────────
 window._addRec=function(title,url,dur){

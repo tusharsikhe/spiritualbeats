@@ -911,17 +911,26 @@ function renderRecordings(){
   grid.innerHTML='';
   recs.forEach((r,i)=>{
     const rid=r.fbId||r.id;
-    const card=document.createElement('div'); card.className='rec-card'; card.id='rc-'+rid;
+    const hasAudio=!!r.url;
+    const isUploading=r.status==='uploading';
+    const card=document.createElement('div');
+    card.className='rec-card'+(hasAudio?'':' rec-unavailable');
+    card.id='rc-'+rid;
     const emoji=r.emoji||'&#127925;';
+    const statusTag=isUploading
+      ? '<span class="rc-tag" style="color:var(--amber);">&#8987; saving…</span>'
+      : !hasAudio
+        ? '<span class="rc-tag" style="color:var(--muted);">audio unavailable</span>'
+        : '';
     card.innerHTML=`
 <div class="rc-top">
   <div class="rc-num">${i+1}</div>
-  <button class="rpbtn" id="rpbtn-${rid}" onclick="playRec('${rid}')" aria-label="Play ${r.title}">
+  <button class="rpbtn${hasAudio?' ':'  '}${!hasAudio?'style="opacity:.4;cursor:default;"':''}" id="rpbtn-${rid}" ${hasAudio?`onclick="playRec('${rid}')" aria-label="Play ${r.title}"`:'disabled'}>
     <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
   </button>
   <div class="rc-info">
     <div class="rc-title">${emoji} ${r.title}</div>
-    <div class="rc-meta"><span class="rc-tag">${r.date}</span><span class="rc-tag">&middot;</span><span class="rc-tag">${r.dur}</span></div>
+    <div class="rc-meta"><span class="rc-tag">${r.date}</span><span class="rc-tag">&middot;</span><span class="rc-tag">${r.dur}</span>${statusTag}</div>
   </div>
   <div class="mwave" id="mw-${rid}" style="display:none;" aria-hidden="true">
     <div class="mbar a" style="animation-delay:0s;"></div>
