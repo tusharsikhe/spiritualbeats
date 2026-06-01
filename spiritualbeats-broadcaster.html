@@ -424,7 +424,7 @@ service firebase.storage {
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, set, onValue, push, remove, serverTimestamp, onChildAdded }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
-import { getStorage, ref as sRef, uploadBytes, getDownloadURL }
+import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 
 // ================================================================
@@ -509,7 +509,7 @@ window.fbUploadRec = async (blob, title, durSec) => {
       const path = 'recordings/' + Date.now() + '_' + title.replace(/\s+/g,'-') + '.webm';
       await uploadBytes(sRef(storage, path), blob);
       const url = await getDownloadURL(sRef(storage, path));
-      await set(recRef, { title, date, dur, durSec, url, status: 'ready', createdAt: serverTimestamp() });
+      await set(recRef, { title, date, dur, durSec, url, storagePath: path, status: 'ready', createdAt: serverTimestamp() });
       window.showToast('Recording saved to Firebase');
       return;
     } catch(e) {
@@ -541,6 +541,15 @@ window.fbUploadRec = async (blob, title, durSec) => {
   window.showToast('Fix Firebase Storage rules to sync long recordings');
   window._dlBlob(URL.createObjectURL(blob), title);
 };
+// ── Delete a recording (RTDB + Storage) ───────────────────────
+window.fbRemoveRec = async (fbId, storagePath) => {
+  if (!db) return;
+  await remove(ref(db, 'recordings/' + fbId));
+  if (storage && storagePath) {
+    try { await deleteObject(sRef(storage, storagePath)); } catch(e) { /* ignore — may already be gone */ }
+  }
+};
+
 // ── Real-time recordings feed ──────────────────────────────────
 window.fbWatchRecs = (cb) => {
   if (!db) { cb([]); return; }
@@ -604,6 +613,24 @@ window.addEventListener('fb-ready', () => {
 let isLive=false, timerSec=0, timerInt=null, meterRAF=null;
 let audioCtx=null, mediaStream=null, analyser=null, recorder=null, chunks=[];
 let currentSrc='mic';
+let wakeLock=null;
+
+// ── WAKE LOCK ────────────────────────────────────────────────────
+async function acquireWakeLock(){
+  if(!('wakeLock' in navigator)) return;
+  try{ wakeLock=await navigator.wakeLock.request('screen'); }
+  catch(e){ console.warn('[SB] Wake lock unavailable:',e.message); }
+}
+function releaseWakeLock(){
+  if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock=null; }
+}
+// Re-acquire if the screen woke back up while still live, and resume AudioContext
+document.addEventListener('visibilitychange',async()=>{
+  if(document.visibilityState==='visible'){
+    if(isLive) await acquireWakeLock();
+    if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume().catch(()=>{});
+  }
+});
 
 // ── WebRTC (broadcaster) ─────────────────────────────────────────
 const STUN=[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}];
@@ -760,6 +787,7 @@ async function toggleLive(){
       setupPeerListener();
     }
   }catch(e){ console.error('[SB] Audio setup error:',e); showToast('Audio error: '+e.message); }
+  acquireWakeLock();
   animateMeter(true,analyser);
   showToast('You are now live on SpiritualBeats!');
 }
@@ -768,6 +796,7 @@ async function toggleLive(){
 function stopBroadcast(){
   if(!isLive){ showToast('Not currently live'); return; }
   isLive=false;
+  releaseWakeLock();
   cancelAnimationFrame(meterRAF);
   stopTimer();
   closeAllPeers();
@@ -834,13 +863,29 @@ window._addRec=function(title,url,dur){
 function renderRecs(){
   const list=document.getElementById('recordingsList'), side=document.getElementById('sideRecordings');
   document.getElementById('emptyRec').style.display=_recs.length?'none':'';
+  const noAudioCb="showToast('No audio yet \u2014 recording is still uploading or Storage rules need updating')";
   const mk=(r,sm)=>{
     const d=document.createElement('div'); d.className='recording-item';
-    d.innerHTML=`<button class="rec-play" onclick="${r.url?'new Audio(\''+r.url+'\').play()':'showToast(\'No audio \u2014 configure Firebase to save recordings\')'}" title="Play"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg></button><div class="rec-info"><div class="rec-name">${r.title}</div><div class="rec-date">${r.date}</div></div><div class="rec-dur">${r.dur}</div>${!sm&&r.url?'<a href="'+r.url+'" target="_blank" class="btn btn-ghost btn-sm" style="text-decoration:none;">&#8595;</a>':''}`;
+    const statusTag=r.status==='uploading'?'<span style="font-size:10px;color:var(--amber);margin-left:6px;">\u23f3</span>':
+                    r.status==='failed'?'<span style="font-size:10px;color:var(--live);margin-left:6px;">\u26a0\ufe0f</span>':'';
+    const playBtn=`<button class="rec-play" onclick="${r.url?'new Audio(\''+r.url+'\').play()':noAudioCb}" title="Play"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>`;
+    const dlBtn=!sm&&r.url?`<a href="${r.url}" target="_blank" class="btn btn-ghost btn-sm" style="text-decoration:none;">&#8595;</a>`:'';
+    const delBtn=!sm?`<button class="btn btn-danger btn-sm" onclick="deleteRec('${r.fbId||''}','${r.storagePath||''}')" title="Delete recording" style="padding:6px 10px;">&#128465;</button>`:'';
+    d.innerHTML=`${playBtn}<div class="rec-info"><div class="rec-name">${r.title}${statusTag}</div><div class="rec-date">${r.date}</div></div><div class="rec-dur">${r.dur}</div>${dlBtn}${delBtn}`;
     return d;
   };
   list.innerHTML=''; side.innerHTML='';
   _recs.forEach(r=>{list.appendChild(mk(r,false));side.appendChild(mk(r,true));});
+}
+
+function deleteRec(fbId,storagePath){
+  if(!fbId){showToast('Cannot delete \u2014 no Firebase ID');return;}
+  if(!confirm('Delete this recording? This cannot be undone.'))return;
+  if(window.fbRemoveRec){
+    window.fbRemoveRec(fbId,storagePath||null)
+      .then(()=>showToast('Recording deleted'))
+      .catch(e=>showToast('Delete failed: '+e.message));
+  }
 }
 renderRecs();
 
